@@ -67,6 +67,7 @@ case "${1:-}" in
 
         TMPFILE=$(mktemp)
         echo "BOARD=$BOARD_ARG" > "$TMPFILE"
+        chmod 0644 "$TMPFILE"
         mv "$TMPFILE" "$CONF_FILE"
         echo "Board set to: $BOARD_ARG"
         systemctl restart rt-handler

@@ -7,6 +7,7 @@
 typedef struct {
     volatile int running;
     volatile int pulse_counter;
+    volatile int worker_failed;
 
     pthread_mutex_t stats_mutex;
 

@@ -11,6 +11,11 @@ typedef struct {
     int edge;
     bool mode_toggle;
     char *consumer;
+    bool has_chip_path;
+    bool has_offset_in;
+    bool has_offset_out;
+    bool has_edge;
+    bool has_consumer;
 } GpioConfig;
 
 typedef struct {
@@ -30,5 +35,6 @@ void config_init(GpioConfig *cfg);
 void config_free(GpioConfig *cfg);
 int config_from_preset(GpioConfig *cfg, const char *board_name);
 int config_from_file(GpioConfig *cfg, const char *filepath);
+int config_validate(const GpioConfig *cfg);
 
 #endif

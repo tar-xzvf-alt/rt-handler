@@ -1,4 +1,6 @@
 #include "gpio_config.h"
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -112,6 +114,16 @@ int config_from_preset(GpioConfig *cfg, const char *board_name)
             cfg->edge       = p->edge;
             cfg->mode_toggle = p->mode_toggle;
             cfg->consumer   = strdup(p->consumer);
+            cfg->has_chip_path = true;
+            cfg->has_offset_in = true;
+            cfg->has_offset_out = true;
+            cfg->has_edge = true;
+            cfg->has_consumer = true;
+            if (!cfg->chip_path || !cfg->consumer) {
+                perror("strdup board preset");
+                config_free(cfg);
+                return -1;
+            }
             return 0;
         }
     }
@@ -125,6 +137,60 @@ static int parse_edge(const char *s)
     if (strcmp(s, "falling") == 0) return GPIOD_LINE_EDGE_FALLING;
     if (strcmp(s, "none") == 0)    return GPIOD_LINE_EDGE_NONE;
     return -1;
+}
+
+static char *trim(char *s)
+{
+    while (*s == ' ' || *s == '\t') s++;
+
+    char *end = s + strlen(s);
+    while (end > s && (end[-1] == ' ' || end[-1] == '\t')) {
+        *--end = '\0';
+    }
+
+    return s;
+}
+
+static int parse_uint_value(const char *s, unsigned int *out)
+{
+    char *end = NULL;
+
+    errno = 0;
+    unsigned long value = strtoul(s, &end, 10);
+    if (errno != 0 || end == s || *end != '\0' || value > UINT_MAX) {
+        return -1;
+    }
+
+    *out = (unsigned int)value;
+    return 0;
+}
+
+static int parse_bool_value(const char *s, bool *out)
+{
+    if (strcmp(s, "1") == 0 || strcmp(s, "true") == 0 || strcmp(s, "yes") == 0) {
+        *out = true;
+        return 0;
+    }
+
+    if (strcmp(s, "0") == 0 || strcmp(s, "false") == 0 || strcmp(s, "no") == 0) {
+        *out = false;
+        return 0;
+    }
+
+    return -1;
+}
+
+static int set_string(char **dst, const char *value)
+{
+    char *copy = strdup(value);
+    if (!copy) {
+        perror("strdup config value");
+        return -1;
+    }
+
+    free(*dst);
+    *dst = copy;
+    return 0;
 }
 
 int config_from_file(GpioConfig *cfg, const char *filepath)
@@ -150,35 +216,73 @@ int config_from_file(GpioConfig *cfg, const char *filepath)
         if (!eq) continue;
 
         *eq = '\0';
-        char *key = p;
-        char *val = eq + 1;
-
-        while (*key == ' ' || *key == '\t') key++;
-        char *kend = key + strlen(key) - 1;
-        while (kend > key && (*kend == ' ' || *kend == '\t')) *kend-- = '\0';
-
-        while (*val == ' ' || *val == '\t') val++;
-        char *vend = val + strlen(val) - 1;
-        while (vend > val && (*vend == ' ' || *vend == '\t')) *vend-- = '\0';
+        char *key = trim(p);
+        char *val = trim(eq + 1);
 
         if (strcmp(key, "GPIO_CHIP") == 0) {
-            free(cfg->chip_path);
-            cfg->chip_path = strdup(val);
+            if (*val == '\0' || set_string(&cfg->chip_path, val) != 0) goto error;
+            cfg->has_chip_path = true;
         } else if (strcmp(key, "GPIO_OFFSET_IN") == 0) {
-            cfg->offset_in = (unsigned int)atoi(val);
+            if (parse_uint_value(val, &cfg->offset_in) != 0) {
+                fprintf(stderr, "Invalid GPIO_OFFSET_IN: %s\n", val);
+                goto error;
+            }
+            cfg->has_offset_in = true;
         } else if (strcmp(key, "GPIO_OFFSET_OUT") == 0) {
-            cfg->offset_out = (unsigned int)atoi(val);
+            if (parse_uint_value(val, &cfg->offset_out) != 0) {
+                fprintf(stderr, "Invalid GPIO_OFFSET_OUT: %s\n", val);
+                goto error;
+            }
+            cfg->has_offset_out = true;
         } else if (strcmp(key, "GPIO_EDGE") == 0) {
             int e = parse_edge(val);
-            if (e >= 0) cfg->edge = e;
+            if (e < 0) {
+                fprintf(stderr, "Invalid GPIO_EDGE: %s\n", val);
+                goto error;
+            }
+            cfg->edge = e;
+            cfg->has_edge = true;
         } else if (strcmp(key, "GPIO_MODE_TOGGLE") == 0) {
-            cfg->mode_toggle = (atoi(val) != 0);
+            if (parse_bool_value(val, &cfg->mode_toggle) != 0) {
+                fprintf(stderr, "Invalid GPIO_MODE_TOGGLE: %s\n", val);
+                goto error;
+            }
         } else if (strcmp(key, "GPIO_CONSUMER") == 0) {
-            free(cfg->consumer);
-            cfg->consumer = strdup(val);
+            if (*val == '\0' || set_string(&cfg->consumer, val) != 0) goto error;
+            cfg->has_consumer = true;
         }
     }
 
     fclose(f);
+    return 0;
+
+error:
+    fclose(f);
+    return -1;
+}
+
+int config_validate(const GpioConfig *cfg)
+{
+    if (!cfg->has_chip_path || !cfg->chip_path || cfg->chip_path[0] == '\0') {
+        fprintf(stderr, "Missing GPIO_CHIP\n");
+        return -1;
+    }
+    if (!cfg->has_offset_in) {
+        fprintf(stderr, "Missing GPIO_OFFSET_IN\n");
+        return -1;
+    }
+    if (!cfg->has_offset_out) {
+        fprintf(stderr, "Missing GPIO_OFFSET_OUT\n");
+        return -1;
+    }
+    if (!cfg->has_edge) {
+        fprintf(stderr, "Missing GPIO_EDGE\n");
+        return -1;
+    }
+    if (!cfg->has_consumer || !cfg->consumer || cfg->consumer[0] == '\0') {
+        fprintf(stderr, "Missing GPIO_CONSUMER\n");
+        return -1;
+    }
+
     return 0;
 }
