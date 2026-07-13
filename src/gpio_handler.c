@@ -1,7 +1,5 @@
 #include "gpio_handler.h"
-#include "utils.h"
 #include "shared_data.h"
-#include "gpio_config.h"
 #include <gpiod.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -13,9 +11,9 @@
 void* gpio_handler_thread(void* arg)
 {
     SharedData *shared = (SharedData*)arg;
+    GpioConfig *cfg = &shared->config;
 
     printf("GPIO handler thread started\n");
-    set_current_thread_rt("gpio_handler");
 
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
@@ -27,10 +25,10 @@ void* gpio_handler_thread(void* arg)
     struct gpiod_request_config *req_cfg;
     unsigned int offsets[2];
 
-    offsets[0] = GPIO_OFFSET_IN;
-    offsets[1] = GPIO_OFFSET_OUT;
+    offsets[0] = cfg->offset_in;
+    offsets[1] = cfg->offset_out;
 
-    chip = gpiod_chip_open(GPIO_CHIP);
+    chip = gpiod_chip_open(cfg->chip_path);
     if (!chip) {
         perror("gpiod_chip_open");
         return NULL;
@@ -38,7 +36,7 @@ void* gpio_handler_thread(void* arg)
 
     in_cfg = gpiod_line_settings_new();
     gpiod_line_settings_set_direction(in_cfg, GPIOD_LINE_DIRECTION_INPUT);
-    gpiod_line_settings_set_edge_detection(in_cfg, GPIO_EDGE);
+    gpiod_line_settings_set_edge_detection(in_cfg, cfg->edge);
 
     out_cfg = gpiod_line_settings_new();
     gpiod_line_settings_set_direction(out_cfg, GPIOD_LINE_DIRECTION_OUTPUT);
@@ -49,7 +47,7 @@ void* gpio_handler_thread(void* arg)
     gpiod_line_config_add_line_settings(line_cfg, &offsets[1], 1, out_cfg);
 
     req_cfg = gpiod_request_config_new();
-    gpiod_request_config_set_consumer(req_cfg, GPIO_CONSUMER);
+    gpiod_request_config_set_consumer(req_cfg, cfg->consumer);
 
     req = gpiod_chip_request_lines(chip, req_cfg, line_cfg);
     if (!req) {
@@ -73,9 +71,7 @@ void* gpio_handler_thread(void* arg)
 
     printf("GPIO handler waiting for interrupts...\n");
 
-#ifdef GPIO_MODE_TOGGLE
     bool toggle = false;
-#endif
 
     while (__atomic_load_n(&shared->running, __ATOMIC_SEQ_CST)) {
         wait_status = gpiod_line_request_read_edge_events(req, evbuf, 1);
@@ -98,30 +94,28 @@ void* gpio_handler_thread(void* arg)
             continue;
         }
 
-#ifdef GPIO_MODE_TOGGLE
-        if (toggle) {
-            gpiod_line_request_set_value(req, offsets[1], 1);
-        } else {
-            gpiod_line_request_set_value(req, offsets[1], 0);
-        }
-        toggle = !toggle;
+        if (cfg->mode_toggle) {
+            if (toggle) {
+                gpiod_line_request_set_value(req, offsets[1], 1);
+            } else {
+                gpiod_line_request_set_value(req, offsets[1], 0);
+            }
+            toggle = !toggle;
 
-        pthread_mutex_lock(&shared->stats_mutex);
-        shared->pulse_counter++;
-        pthread_cond_signal(&shared->measurement_cond);
-        pthread_mutex_unlock(&shared->stats_mutex);
-#else
-        if (gpiod_edge_event_get_event_type(ev) == GPIOD_EDGE_EVENT_RISING_EDGE) {
-            gpiod_line_request_set_value(req, offsets[1], 1);
+            pthread_mutex_lock(&shared->stats_mutex);
+            shared->pulse_counter++;
+            pthread_mutex_unlock(&shared->stats_mutex);
         } else {
-            gpiod_line_request_set_value(req, offsets[1], 0);
-        }
+            if (gpiod_edge_event_get_event_type(ev) == GPIOD_EDGE_EVENT_RISING_EDGE) {
+                gpiod_line_request_set_value(req, offsets[1], 1);
+            } else {
+                gpiod_line_request_set_value(req, offsets[1], 0);
+            }
 
-        pthread_mutex_lock(&shared->stats_mutex);
-        shared->pulse_counter++;
-        pthread_cond_signal(&shared->measurement_cond);
-        pthread_mutex_unlock(&shared->stats_mutex);
-#endif
+            pthread_mutex_lock(&shared->stats_mutex);
+            shared->pulse_counter++;
+            pthread_mutex_unlock(&shared->stats_mutex);
+        }
 
         pthread_testcancel();
     }

@@ -1,0 +1,18 @@
+[Unit]
+Description=RT Handler - real-time GPIO monitor
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/rt-handler -b starfive
+Restart=on-failure
+RestartSec=5
+LimitRTPRIO=99
+ProtectSystem=strict
+ReadWritePaths=/dev /sys /proc
+DeviceAllow=char-gpiochip rw
+PrivateTmp=yes
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
