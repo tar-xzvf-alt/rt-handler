@@ -1,8 +1,8 @@
 Name: rt-handler
-Version: 0.1.1
+Version: 0.1.2
 Release: alt1
 Summary: Real-time GPIO monitor for SBC latency testing
-License: MIT
+License: GPLv3
 Group: System/Servers
 Url: https://altlinux.space/besogon1238/rt-handler
 
@@ -46,11 +46,11 @@ install -Dm644 deploy/%name.service %buildroot%_unitdir/%name.service
 %_unitdir/%name.service
 
 %changelog
-* Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.0-alt4
-- Add board selection via /etc/sysconfig, rt-handler-set-board
+* Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.2-alt1
+- Translate README, switch license to GPLv3 
 
-* Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.0-alt3
-- Add set-board script and sysconfig
+* Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.1-alt1
+- Add board selection via /etc/sysconfig, rt-handler-set-board utility
 
 * Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.0-alt2
 - Update packaging
