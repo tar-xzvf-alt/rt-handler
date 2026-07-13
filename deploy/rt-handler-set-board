@@ -1,0 +1,9 @@
+#!/bin/sh
+set -e
+
+BOARD="${1:?Usage: rt-handler-set-board <board>}"
+CONF_FILE="/etc/sysconfig/rt-handler"
+
+echo "BOARD=$BOARD" > "$CONF_FILE"
+echo "Board set to: $BOARD"
+systemctl restart rt-handler

@@ -1,6 +1,6 @@
 Name: rt-handler
-Version: 0.1.0
-Release: alt2
+Version: 0.1.1
+Release: alt1
 Summary: Real-time GPIO monitor for SBC latency testing
 License: MIT
 Group: System/Servers
@@ -25,8 +25,11 @@ cd src
 
 %install
 install -Dm755 src/%name %buildroot%_sbindir/%name
+install -Dm755 deploy/rt-handler-set-board %buildroot%_sbindir/rt-handler-set-board
 install -d %buildroot%_sysconfdir/%name/boards.d
 install -m644 conf/boards.d/*.conf %buildroot%_sysconfdir/%name/boards.d/
+install -d %buildroot%_sysconfdir/sysconfig
+echo 'BOARD=starfive' > %buildroot%_sysconfdir/sysconfig/%name
 install -Dm644 deploy/%name.service %buildroot%_unitdir/%name.service
 
 %post
@@ -37,13 +40,20 @@ install -Dm644 deploy/%name.service %buildroot%_unitdir/%name.service
 
 %files
 %_sbindir/rt-handler
+%_sbindir/rt-handler-set-board
 %config(noreplace) %_sysconfdir/rt-handler/boards.d/
+%config(noreplace) %_sysconfdir/sysconfig/rt-handler
 %_unitdir/%name.service
 
 %changelog
+* Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.0-alt4
+- Add board selection via /etc/sysconfig, rt-handler-set-board
+
+* Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.0-alt3
+- Add set-board script and sysconfig
+
 * Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.0-alt2
-- Update packaging 
+- Update packaging
 
 * Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.0-alt1
-- Initial version 
-
+- Initial version

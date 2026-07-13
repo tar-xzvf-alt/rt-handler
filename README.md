@@ -1,21 +1,21 @@
-# RT Handler — С-код для тестирования real-time задержек на одноплатниках
+# RT Handler — GPIO-монитор real-time задержек на одноплатниках
 
-В этом репозитории находится С-код, работающий на стороне одноплатника: ответ на
-GPIO-импульсы от Arduino, сбор метрик CPU/памяти через `/proc/stat` и `/proc/meminfo`,
-запись статистики групп в лог-файл. Является частью проекта [rt-tester](https://altlinux.space/besogon1238/rt-tester).
+С-демон, работающий на стороне одноплатника: отвечает на GPIO-импульсы от
+Arduino (тестера) встречным сигналом на выходной линии. Является частью
+проекта [rt-tester](https://altlinux.space/besogon1238/rt-tester).
 
 ## Поддерживаемые платы
 
-| Платформа | Архитектура | GPIO Chip | Consumer | Документация |
-|-----------|-------------|-----------|----------|-------------|
-| Lichee RV Dock | RISC-V | `/dev/gpiochip0` | `lichee-monitor` | [📄](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/lichee_tests.md) |
-| Radxa RK3588 5B | ARM | `/dev/gpiochip3` | `radxa-monitor` | [📄](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/radxa_tests.md) |
-| Starfive Visionfive 2 | RISC-V | `/dev/gpiochip0` | `starfive-monitor` | [📄](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/visionfive_tests.md) |
-| БЦВМ АРМ | ARM | `/dev/gpiochip0` | `bcvm-monitor` | [📄](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/bcvmarm_tests.md) |
-| БВЦ АРМ | ARM | `/dev/gpiochip0` | `bvcarm-mo` | [📄](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/bvcarm_tests.md) |
-| MangoPi MQ Pro | RISC-V | `/dev/gpiochip0` | `mangopi-monitor` | [📄](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/mangopi_tests.md) |
-| RockPI 4 | ARM | `/dev/gpiochip4` | `rockpi4-monitor` | [📄](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/rockpi4_tests.md) |
-| RepkaPI 4 | ARM | `/dev/gpiochip1` | `repkapi4-monitor` | [📄](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/repkapi4_tests.md) |
+| Платформа | Архитектура | GPIO Chip | Consumer |
+|-----------|-------------|-----------|----------|
+| Lichee RV Dock | RISC-V | `/dev/gpiochip0` | `lichee-monitor` |
+| Radxa RK3588 5B | ARM | `/dev/gpiochip3` | `radxa-monitor` |
+| Starfive Visionfive 2 | RISC-V | `/dev/gpiochip0` | `starfive-monitor` |
+| БЦВМ АРМ | ARM | `/dev/gpiochip0` | `bcvm-monitor` |
+| БВЦ АРМ | ARM | `/dev/gpiochip0` | `bvcarm-mo` |
+| MangoPi MQ Pro | RISC-V | `/dev/gpiochip0` | `mangopi-monitor` |
+| RockPI 4 | ARM | `/dev/gpiochip4` | `rockpi4-monitor` |
+| RepkaPI 4 | ARM | `/dev/gpiochip1` | `repkapi4-monitor` |
 
 ## Зависимости (ALT Linux)
 
@@ -26,53 +26,100 @@ apt-get install gcc make libgpiod-devel
 ## Сборка
 
 ```bash
-make BOARD=lichee
+cd src && make
 ```
 
-Где `BOARD` — одно из: `bvc`, `bcvm`, `lichee`, `radxa`, `starfive`, `mangopi`, `rockpi4`, `repkapi4`, `bvc_arm`.
+Бинарь: `rt-handler` — универсальный, плата выбирается при запуске.
 
-После сборки бинарник называется `$(BOARD)-monitor` (например, `lichee-monitor`).
+## Использование
 
-## Приоритеты реального времени
+```bash
+# Выбор платы из встроенного пресета
+rt-handler -b starfive
 
-Для минимизации задержек используются политика `SCHED_FIFO` и три уровня приоритетов:
+# Загрузка из конфиг-файла
+rt-handler -c /etc/rt-handler/boards.d/starfive.conf
 
+# Пресет + переопределение параметров из файла
+rt-handler -b starfive -c /etc/rt-handler/boards.d/custom.conf
+
+# Список доступных плат
+rt-handler -h
 ```
-IRQ-поток (прерывание GPIO):   99 (SCHED_FIFO)  — максимальный
-Обработчик GPIO:               80 (SCHED_FIFO)  — отвечает на импульсы
-Сборщик метрик CPU/памяти:      79 (SCHED_FIFO)  — на 1 ниже обработчика
+
+### Формат конфиг-файла
+
+```ini
+GPIO_CHIP=/dev/gpiochip0
+GPIO_OFFSET_IN=60
+GPIO_OFFSET_OUT=61
+GPIO_EDGE=both
+GPIO_MODE_TOGGLE=0
+GPIO_CONSUMER=starfive-monitor
 ```
 
-## Конфигурация GPIO
+Ключи: `GPIO_EDGE` — `both` / `rising` / `falling` / `none`, `GPIO_MODE_TOGGLE` — `0` или `1`.
 
-Пины для каждой платы заданы в `src/gpio_config.h` через `-DBOARD_xxx`:
+Готовые конфиги для каждой платы находятся в `conf/boards.d/` и при установке RPM копируются в `/etc/rt-handler/boards.d/`.
+
+## Конфигурация GPIO по платам
 
 | Платформа | Вход (от Arduino pin 7) | Выход (к Arduino pin 20) |
 |-----------|------------------------|--------------------------|
-| Lichee RV Dock | offset 140 (bank 4×32+12) | offset 144 (bank 4×32+16) |
-| Radxa RK3588 5B | offset 10 (bank 1×8+2) | offset 11 (bank 1×8+3) |
+| Lichee RV Dock | offset 140 | offset 144 |
+| Radxa RK3588 5B | offset 10 | offset 11 |
 | Starfive Visionfive 2 | offset 60 | offset 61 |
 | БЦВМ АРМ | offset 15 | offset 9 |
 | БВЦ АРМ | offset 0 | offset 4 |
-| MangoPi MQ Pro | offset 35 (bank 1×32+3) | offset 36 (bank 1×32+4) |
+| MangoPi MQ Pro | offset 35 | offset 36 |
 | RockPI 4 | offset 6 | offset 7 |
-| RepkaPI 4 | offset 205 (bank 6×32+13) | offset 204 (bank 6×32+12) |
+| RepkaPI 4 | offset 205 | offset 204 |
+
+## Установка и запуск как systemd-сервис
+
+```bash
+# Сборка RPM (на сборочной машине или на самой плате)
+tar xf rt-handler-0.2.0.tar.gz
+cd rt-handler-0.2.0/src && make
+rpmbuild -ba rt-handler.spec
+
+# Установка
+apt-get install rt-handler-*.riscv64.rpm
+
+# Управление сервисом
+systemctl enable --now rt-handler    # запустить и добавить в автозагрузку
+systemctl status rt-handler          # статус
+systemctl stop rt-handler            # остановить
+systemctl start rt-handler           # запустить
+journalctl -u rt-handler             # просмотр логов
+
+# Смена платы
+rt-handler-set-board lichee           # переключить на Lichee RV Dock
+rt-handler-set-board starfive         # вернуть на VisionFive 2
+```
+
+## Конфигурация сервиса
+
+Плата по умолчанию хранится в `/etc/sysconfig/rt-handler`:
+
+```
+BOARD=starfive
+```
+
+Сменить плату — один из двух способов:
+
+1. **Команда** `rt-handler-set-board <board>` — меняет плату и сразу перезапускает сервис.
+2. **Вручную** — отредактировать `/etc/sysconfig/rt-handler` и выполнить `systemctl restart rt-handler`.
 
 ## Архитектура
 
 ```
-Arduino Mega ──(GPIO импульс)──→ Одноплатник (этот код)
-  pin 7 →                        ├─ Обработчик GPIO (prio 80): ждёт фронт
-  pin 20 ←                        ├─ Выставляет ответ на выходной линии
-                                  └─ Сборщик метрик (prio 79): /proc/stat + /proc/meminfo → лог
-
-Приёмник на ПК (receiver.py) читает данные от Arduino через serial.
+Arduino Mega ──(GPIO импульс)────────────────→ Одноплатник (rt-handler)
+   pin 7  →                                      ├─ Обработчик GPIO: ждёт фронт/спад
+   pin 20 ←                                      └─ Выставляет ответ на выходной линии
 ```
 
 ## Связанные проекты
 
 - [rt-tester](https://altlinux.space/besogon1238/rt-tester) — ПК-приёмник, прошивка Arduino, Prometheus/Grafana, результаты тестирования
-- [rt-supervisor](https://altlinux.space/besogon1238/rt-supervisor) — Ethernet-супервизор + controller-emu для сквозного тестирования
-
-Результаты тестирования плат хранятся в [rt-tester/tests/](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/).
-Ссылки на документацию по каждой плате — в таблице выше.
+- [rt-supervisor](https://altlinux.space/besogon1238/rt-supervisor) — Ethernet-супервизор для сквозного тестирования

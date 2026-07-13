@@ -4,12 +4,13 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=/usr/sbin/rt-handler -b starfive
+EnvironmentFile=-/etc/sysconfig/rt-handler
+ExecStart=/usr/sbin/rt-handler -b ${BOARD}
 Restart=on-failure
 RestartSec=5
 LimitRTPRIO=99
 ProtectSystem=strict
-ReadWritePaths=/dev /sys /proc
+ReadWritePaths=/dev /sys /proc /etc/sysconfig
 DeviceAllow=char-gpiochip rw
 PrivateTmp=yes
 NoNewPrivileges=yes
