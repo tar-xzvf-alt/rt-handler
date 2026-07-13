@@ -1,5 +1,5 @@
 Name: rt-handler
-Version: 0.1.2
+Version: 0.1.3
 Release: alt1
 Summary: Real-time GPIO monitor for SBC latency testing
 License: GPLv3
@@ -39,6 +39,7 @@ install -Dm644 deploy/%name.service %buildroot%_unitdir/%name.service
 %systemd_preun %name.service
 
 %files
+%doc README.md LICENSE.md
 %_sbindir/rt-handler
 %_sbindir/rt-handler-set-board
 %config(noreplace) %_sysconfdir/rt-handler/boards.d/
@@ -46,6 +47,11 @@ install -Dm644 deploy/%name.service %buildroot%_unitdir/%name.service
 %_unitdir/%name.service
 
 %changelog
+* Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.3-alt1
+- Add --help/list/show/validation to rt-handler-set-board
+- Update Makefile for RPM macro support
+- Add %doc to package
+
 * Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.2-alt1
 - Translate README, switch license to GPLv3 
 

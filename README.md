@@ -31,6 +31,16 @@ cd src && make
 
 Produces a single binary `rt-handler` — board is selected at runtime.
 
+### Cross-build RPM with gear-hsh (ALT Linux)
+
+```bash
+gear-hsh --no-sisyphus-check -v \
+  --apt-config=/path/to/apt/riscv64.conf \
+  --target riscv64 \
+  --nprocs=12 \
+  /path/to/hasher/riscv64_chroot/
+```
+
 ## Usage
 
 ```bash
@@ -79,10 +89,12 @@ copies them to `/etc/rt-handler/boards.d/`.
 ## Installation and systemd service
 
 ```bash
-# Build RPM (on build machine or on the board itself)
-tar xf rt-handler-0.2.0.tar.gz
-cd rt-handler-0.2.0/src && make
-rpmbuild -ba rt-handler.spec
+# Build RPM
+gear-hsh --no-sisyphus-check -v \
+  --apt-config=/path/to/apt/riscv64.conf \
+  --target riscv64 \
+  --nprocs=12 \
+  /path/to/hasher/riscv64_chroot/
 
 # Install
 apt-get install rt-handler-*.riscv64.rpm
@@ -93,10 +105,6 @@ systemctl status rt-handler          # status
 systemctl stop rt-handler            # stop
 systemctl start rt-handler           # start
 journalctl -u rt-handler             # view logs
-
-# Change board
-rt-handler-set-board lichee          # switch to Lichee RV Dock
-rt-handler-set-board starfive        # switch back to VisionFive 2
 ```
 
 ## Service configuration
@@ -113,6 +121,28 @@ Two ways to switch:
    the service immediately.
 2. **Manually** — edit `/etc/sysconfig/rt-handler` then
    `systemctl restart rt-handler`.
+
+### rt-handler-set-board
+
+```bash
+rt-handler-set-board starfive      # switch to VisionFive 2
+rt-handler-set-board lichee        # switch to Lichee RV Dock
+rt-handler-set-board list          # list available boards
+rt-handler-set-board show          # show current board
+rt-handler-set-board --help        # show usage
+```
+
+### Troubleshooting: stale unit override
+
+If `rt-handler-set-board` does not change the running board, a leftover unit
+file in `/etc/systemd/system/` may shadow the packaged unit:
+
+```bash
+systemctl cat rt-handler           # check which file is loaded
+systemctl revert rt-handler        # remove local override
+systemctl daemon-reload
+systemctl restart rt-handler
+```
 
 ## Architecture
 

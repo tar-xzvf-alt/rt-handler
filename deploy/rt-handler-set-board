@@ -1,9 +1,74 @@
 #!/bin/sh
 set -e
 
-BOARD="${1:?Usage: rt-handler-set-board <board>}"
+BOARDS_DIR="/etc/rt-handler/boards.d"
 CONF_FILE="/etc/sysconfig/rt-handler"
 
-echo "BOARD=$BOARD" > "$CONF_FILE"
-echo "Board set to: $BOARD"
-systemctl restart rt-handler
+usage() {
+    echo "Usage: rt-handler-set-board <board>"
+    echo "       rt-handler-set-board list"
+    echo "       rt-handler-set-board show"
+    echo "       rt-handler-set-board --help"
+    echo ""
+    echo "  <board>   set default board and restart service"
+    echo "  list      list available boards"
+    echo "  show      show current board"
+    echo "  --help    this help"
+    exit 0
+}
+
+list_boards() {
+    if [ -d "$BOARDS_DIR" ]; then
+        for f in "$BOARDS_DIR"/*.conf; do
+            [ -f "$f" ] || continue
+            basename "$f" .conf
+        done
+    else
+        echo "No boards directory found: $BOARDS_DIR" >&2
+        exit 1
+    fi
+}
+
+show_board() {
+    if [ -f "$CONF_FILE" ]; then
+        . "$CONF_FILE"
+        echo "Current board: ${BOARD:-<not set>}"
+    else
+        echo "Config file not found: $CONF_FILE" >&2
+        exit 1
+    fi
+}
+
+# -------- main --------
+
+case "${1:-}" in
+    --help|-h|help)
+        usage
+        ;;
+    list)
+        list_boards
+        ;;
+    show)
+        show_board
+        ;;
+    "")
+        echo "Error: no command specified" >&2
+        usage
+        ;;
+    *)
+        BOARD_ARG="$1"
+
+        if [ ! -f "$BOARDS_DIR/$BOARD_ARG.conf" ]; then
+            echo "Error: unknown board '$BOARD_ARG'" >&2
+            echo "Available boards:" >&2
+            list_boards >&2
+            exit 1
+        fi
+
+        TMPFILE=$(mktemp)
+        echo "BOARD=$BOARD_ARG" > "$TMPFILE"
+        mv "$TMPFILE" "$CONF_FILE"
+        echo "Board set to: $BOARD_ARG"
+        systemctl restart rt-handler
+        ;;
+esac

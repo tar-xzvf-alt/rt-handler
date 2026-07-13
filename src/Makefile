@@ -1,6 +1,6 @@
-CC       = gcc
-CFLAGS   = -pthread -Wall -O2 -D_GNU_SOURCE
-LDFLAGS  = -lgpiod -lrt
+CC      ?= gcc
+CFLAGS  ?= -pthread -Wall -O2 -D_GNU_SOURCE
+LDFLAGS ?= -lgpiod -lrt
 
 SRCS = main.c gpio_handler.c gpio_config.c
 OBJS = $(SRCS:.c=.o)

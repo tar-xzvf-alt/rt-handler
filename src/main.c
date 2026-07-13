@@ -20,6 +20,8 @@ static void print_usage(const char *prog)
     fprintf(stderr, ")\n");
     fprintf(stderr, "  -c <config>  config file (overrides preset)\n");
     fprintf(stderr, "  -h           this help\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "For systemd service use: rt-handler-set-board <board>\n");
 }
 
 void signal_handler(int sig)
