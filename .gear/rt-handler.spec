@@ -1,5 +1,5 @@
 Name: rt-handler
-Version: 0.1.5
+Version: 0.1.6
 Release: alt1
 Summary: Real-time GPIO monitor for SBC latency testing
 License: GPLv3
@@ -47,6 +47,9 @@ install -Dm644 deploy/%name.service %buildroot%_unitdir/%name.service
 %doc README.md LICENSE.md
 
 %changelog
+* Thu Jul 16 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.6-alt1
+- Update README and package deployment documentation
+
 * Mon Jul 13 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.5-alt1
 - Preserve permissions for /etc/sysconfig/rt-handler in set-board helper
 
